@@ -3,8 +3,16 @@ package vertx;
 import com.fizzed.rocker.ContentType;
 import com.fizzed.rocker.RockerOutputFactory;
 import io.netty.util.concurrent.MultithreadEventExecutorGroup;
-import io.vertx.pgclient.*;
-import io.vertx.core.*;
+import io.vertx.core.AbstractVerticle;
+import io.vertx.core.AsyncResult;
+import io.vertx.core.CompositeFuture;
+import io.vertx.core.DeploymentOptions;
+import io.vertx.core.Future;
+import io.vertx.core.Handler;
+import io.vertx.core.MultiMap;
+import io.vertx.core.Promise;
+import io.vertx.core.Vertx;
+import io.vertx.core.VertxOptions;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.http.HttpServer;
@@ -16,7 +24,8 @@ import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
-import io.vertx.sqlclient.PoolOptions;
+import io.vertx.pgclient.PgConnectOptions;
+import io.vertx.pgclient.PgConnection;
 import io.vertx.sqlclient.PreparedQuery;
 import io.vertx.sqlclient.PreparedStatement;
 import io.vertx.sqlclient.Row;
@@ -24,7 +33,6 @@ import io.vertx.sqlclient.RowIterator;
 import io.vertx.sqlclient.RowSet;
 import io.vertx.sqlclient.Tuple;
 import io.vertx.sqlclient.impl.SqlClientInternal;
-import io.vertx.sqlclient.impl.command.CompositeCommand;
 import vertx.model.Fortune;
 import vertx.model.Message;
 import vertx.model.World;
@@ -94,7 +102,7 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
 
   private static final String UPDATE_WORLD = "UPDATE world SET randomnumber=$1 WHERE id=$2";
   private static final String SELECT_WORLD = "SELECT id, randomnumber from WORLD where id=$1";
-  private static final String SELECT_FORTUNE = "SELECT id, message from FORTUNE";
+  private static final String SELECT_FORTUNE = "SELECT id, message FROM (SELECT id, message FROM FORTUNE, generate_series(1, 3)) AS F";
 
   private HttpServer server;
 
@@ -349,23 +357,23 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
     SELECT_FORTUNE_QUERY.execute(ar -> {
       HttpServerResponse response = req.response();
       if (ar.succeeded()) {
-        List<Fortune> fortunes = new ArrayList<>();
-        RowIterator<Row> resultSet = ar.result().iterator();
-        if (!resultSet.hasNext()) {
+        RowSet<Row> rows = ar.result();
+        int size = rows.size();
+        if (size == 0) {
           response.setStatusCode(404).end("No results");
           return;
         }
-        while (resultSet.hasNext()) {
-          Row row = resultSet.next();
+        List<Fortune> fortunes = new ArrayList<>(size + 1);
+        for (Row row : rows) {
           fortunes.add(new Fortune(row.getInteger(0), row.getString(1)));
         }
         fortunes.add(new Fortune(0, "Additional fortune added at request time."));
         Collections.sort(fortunes);
         response
-            .putHeader(HttpHeaders.SERVER, SERVER)
-            .putHeader(HttpHeaders.DATE, dateString)
-            .putHeader(HttpHeaders.CONTENT_TYPE, RESPONSE_TYPE_HTML)
-            .end(FortunesTemplate.template(fortunes).render(factory).buffer(), NULL_HANDLER);
+          .putHeader(HttpHeaders.SERVER, SERVER)
+          .putHeader(HttpHeaders.DATE, dateString)
+          .putHeader(HttpHeaders.CONTENT_TYPE, RESPONSE_TYPE_HTML)
+          .end(FortunesTemplate.template(fortunes).render(factory).buffer(), NULL_HANDLER);
       } else {
         Throwable err = ar.cause();
         logger.error("", err);
