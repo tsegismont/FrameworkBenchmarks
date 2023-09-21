@@ -4,7 +4,10 @@ import com.fasterxml.jackson.module.blackbird.BlackbirdModule;
 import io.vertx.benchmark.model.Fortune;
 import io.vertx.benchmark.model.Message;
 import io.vertx.benchmark.model.World;
-import io.vertx.core.*;
+import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Handler;
+import io.vertx.core.Promise;
+import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
@@ -12,13 +15,19 @@ import io.vertx.core.json.jackson.DatabindCodec;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.templ.rocker.RockerTemplateEngine;
+import io.vertx.micrometer.PrometheusScrapingHandler;
 import io.vertx.pgclient.PgConnectOptions;
 import io.vertx.pgclient.PgConnection;
-import io.vertx.sqlclient.*;
+import io.vertx.sqlclient.Row;
+import io.vertx.sqlclient.RowIterator;
+import io.vertx.sqlclient.Tuple;
 
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 import static io.vertx.benchmark.Helper.randomWorld;
 
@@ -272,6 +281,8 @@ public class App extends AbstractVerticle {
             .putHeader(HttpHeaders.CONTENT_TYPE, "text/plain")
             .end("Hello, World!");
       });
+
+      app.route("/metrics").handler(PrometheusScrapingHandler.create());
 
       vertx.createHttpServer().requestHandler(app).listen(8080, listen -> {
         if (listen.failed()) {
