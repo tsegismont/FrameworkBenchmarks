@@ -1,4 +1,4 @@
-FROM maven:3.9.0-eclipse-temurin-17 as maven
+FROM maven:3.9.4-eclipse-temurin-17 as maven
 WORKDIR /vertx
 COPY src src
 COPY pom.xml pom.xml
