@@ -23,9 +23,9 @@
 			<version>${stack.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>io.vertx</groupId>
+			<groupId>com.github.tsegismont</groupId>
 			<artifactId>vertx-micrometer-metrics</artifactId>
-			<version>${stack.version}</version>
+			<version>21d9f75</version>
 		</dependency>
 		<dependency>
 			<groupId>io.micrometer</groupId>
@@ -167,5 +167,12 @@
 			</dependencies>
 		</profile>
 	</profiles>
+
+	<repositories>
+		<repository>
+			<id>jitpack.io</id>
+			<url>https://jitpack.io</url>
+		</repository>
+	</repositories>
 
 </project>
