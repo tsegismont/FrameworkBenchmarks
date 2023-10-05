@@ -25,7 +25,7 @@
 		<dependency>
 			<groupId>com.github.tsegismont</groupId>
 			<artifactId>vertx-micrometer-metrics</artifactId>
-			<version>33f060f</version>
+			<version>2af287b</version>
 		</dependency>
 		<dependency>
 			<groupId>io.micrometer</groupId>
