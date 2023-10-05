@@ -25,12 +25,18 @@
 		<dependency>
 			<groupId>com.github.tsegismont</groupId>
 			<artifactId>vertx-micrometer-metrics</artifactId>
-			<version>33f060f</version>
+			<version>6bafb45</version>
 		</dependency>
 		<dependency>
 			<groupId>io.micrometer</groupId>
 			<artifactId>micrometer-registry-prometheus</artifactId>
 			<version>1.11.3</version>
+			<exclusions>
+				<exclusion>
+					<groupId>io.micrometer</groupId>
+					<artifactId>micrometer-core</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>io.vertx</groupId>
