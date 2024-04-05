@@ -3,32 +3,20 @@ package vertx;
 import com.fizzed.rocker.ContentType;
 import com.fizzed.rocker.RockerOutputFactory;
 import io.netty.util.concurrent.MultithreadEventExecutorGroup;
-import io.vertx.core.impl.VertxInternal;
-import io.vertx.pgclient.*;
 import io.vertx.core.*;
 import io.vertx.core.buffer.Buffer;
-import io.vertx.core.http.HttpHeaders;
-import io.vertx.core.http.HttpServer;
-import io.vertx.core.http.HttpServerOptions;
-import io.vertx.core.http.HttpServerRequest;
-import io.vertx.core.http.HttpServerResponse;
+import io.vertx.core.http.*;
+import io.vertx.core.impl.VertxInternal;
+import io.vertx.core.impl.logging.Logger;
+import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
-import io.vertx.core.logging.Logger;
-import io.vertx.core.logging.LoggerFactory;
-import io.vertx.sqlclient.PreparedQuery;
-import io.vertx.sqlclient.PreparedStatement;
-import io.vertx.sqlclient.Row;
-import io.vertx.sqlclient.RowIterator;
-import io.vertx.sqlclient.RowSet;
-import io.vertx.sqlclient.Tuple;
+import io.vertx.pgclient.PgConnectOptions;
+import io.vertx.pgclient.PgConnection;
+import io.vertx.sqlclient.*;
 import io.vertx.sqlclient.impl.SqlClientInternal;
-import vertx.model.CachedWorld;
-import vertx.model.Fortune;
-import vertx.model.Message;
-import vertx.model.World;
-import vertx.model.WorldCache;
+import vertx.model.*;
 import vertx.rocker.BufferRockerOutput;
 
 import java.io.ByteArrayOutputStream;
@@ -41,7 +29,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
@@ -78,8 +65,6 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
   private static final String PATH_UPDATES = "/updates";
   private static final String PATH_FORTUNES = "/fortunes";
   private static final String PATH_CACHING = "/cached-queries";
-
-  private static final Handler<AsyncResult<Void>> NULL_HANDLER = null;
 
   private static final CharSequence RESPONSE_TYPE_PLAIN = HttpHeaders.createOptimized("text/plain");
   private static final CharSequence RESPONSE_TYPE_HTML = HttpHeaders.createOptimized("text/html; charset=UTF-8");
@@ -153,7 +138,7 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
                       .execute()
                       .map(worlds -> new WorldCache(worlds.value()))
                       .andThen(onSuccess(wc -> WORLD_CACHE = wc));
-              return CompositeFuture.join(f1, f2, f3, f4);
+              return Future.join(f1, f2, f3, f4);
             })
             .transform(ar -> {
               databaseErr = ar.cause();
@@ -222,7 +207,7 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
     for (int i = 0;i < plaintextHeaders.length; i+= 2) {
       headers.add(plaintextHeaders[i], plaintextHeaders[i + 1]);
     }
-    response.end(HELLO_WORLD_BUFFER, NULL_HANDLER);
+    response.end(HELLO_WORLD_BUFFER);
   }
 
   private void handleJson(HttpServerRequest request) {
@@ -232,7 +217,7 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
         .add(HEADER_CONTENT_TYPE, RESPONSE_TYPE_JSON)
         .add(HEADER_SERVER, SERVER)
         .add(HEADER_DATE, dateString);
-    response.end(new Message("Hello, World!").toBuffer(), NULL_HANDLER);
+    response.end(new Message("Hello, World!").toBuffer());
   }
 
   /**
@@ -247,7 +232,7 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
 
   private void handleDb(HttpServerRequest req) {
     HttpServerResponse resp = req.response();
-    SELECT_WORLD_QUERY.execute(Tuple.of(randomWorld()), res -> {
+    SELECT_WORLD_QUERY.execute(Tuple.of(randomWorld())).onComplete(res -> {
       if (res.succeeded()) {
         RowIterator<Row> resultSet = res.result().iterator();
         if (!resultSet.hasNext()) {
@@ -259,7 +244,7 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
             .putHeader(HttpHeaders.SERVER, SERVER)
             .putHeader(HttpHeaders.DATE, dateString)
             .putHeader(HttpHeaders.CONTENT_TYPE, RESPONSE_TYPE_JSON)
-            .end(Json.encode(new World(row.getInteger(0), row.getInteger(1))), NULL_HANDLER);
+            .end(Json.encode(new World(row.getInteger(0), row.getInteger(1))));
       } else {
         sendError(req, res.cause());
       }
@@ -283,7 +268,7 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
     private void handle() {
       client.group(c -> {
         for (int i = 0; i < queries; i++) {
-          c.preparedQuery(SELECT_WORLD).execute(Tuple.of(randomWorld()), this);
+          c.preparedQuery(SELECT_WORLD).execute(Tuple.of(randomWorld())).onComplete(this);
         }
       });
     }
@@ -307,7 +292,7 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
               .putHeader(HttpHeaders.SERVER, SERVER)
               .putHeader(HttpHeaders.DATE, dateString)
               .putHeader(HttpHeaders.CONTENT_TYPE, RESPONSE_TYPE_JSON)
-              .end(worlds.encode(), NULL_HANDLER);
+              .end(worlds.encode());
         }
       }
     }
@@ -333,7 +318,7 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
         for (int i = 0; i < worlds.length; i++) {
           int id = randomWorld();
           int index = i;
-          preparedQuery.execute(Tuple.of(id), ar2 -> {
+          preparedQuery.execute(Tuple.of(id)).onComplete(ar2 -> {
             if (!failed) {
               if (ar2.failed()) {
                 failed = true;
@@ -356,7 +341,7 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
       for (World world : worlds) {
         batch.add(Tuple.of(world.getRandomNumber(), world.getId()));
       }
-      UPDATE_WORLD_QUERY.executeBatch(batch, ar2 -> {
+      UPDATE_WORLD_QUERY.executeBatch(batch).onComplete(ar2 -> {
         if (ar2.failed()) {
           sendError(req, ar2.cause());
           return;
@@ -369,13 +354,13 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
             .putHeader(HttpHeaders.SERVER, SERVER)
             .putHeader(HttpHeaders.DATE, dateString)
             .putHeader(HttpHeaders.CONTENT_TYPE, RESPONSE_TYPE_JSON)
-            .end(json.toBuffer(), NULL_HANDLER);
+            .end(json.toBuffer());
       });
     }
   }
 
   private void handleFortunes(HttpServerRequest req) {
-    SELECT_FORTUNE_QUERY.execute(ar -> {
+    SELECT_FORTUNE_QUERY.execute().onComplete(ar -> {
       HttpServerResponse response = req.response();
       if (ar.succeeded()) {
         List<Fortune> fortunes = new ArrayList<>();
@@ -394,7 +379,7 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
             .putHeader(HttpHeaders.SERVER, SERVER)
             .putHeader(HttpHeaders.DATE, dateString)
             .putHeader(HttpHeaders.CONTENT_TYPE, RESPONSE_TYPE_HTML)
-            .end(FortunesTemplate.template(fortunes).render(factory).buffer(), NULL_HANDLER);
+            .end(FortunesTemplate.template(fortunes).render(factory).buffer());
       } else {
         sendError(req, ar.cause());
       }
@@ -424,7 +409,7 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
         .add(HEADER_CONTENT_TYPE, RESPONSE_TYPE_JSON)
         .add(HEADER_SERVER, SERVER)
         .add(HEADER_DATE, dateString);
-    response.end(json.toBuffer(), NULL_HANDLER);
+    response.end(json.toBuffer());
   }
 
   public static void main(String[] args) throws Exception {
@@ -445,7 +430,7 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
     });
     printConfig(vertx);
     vertx.deployVerticle(App.class.getName(),
-        new DeploymentOptions().setInstances(eventLoopPoolSize).setConfig(config), event -> {
+        new DeploymentOptions().setInstances(eventLoopPoolSize).setConfig(config)).onComplete(event -> {
           if (event.succeeded()) {
             logger.info("Server listening on port " + 8080);
           } else {
@@ -477,7 +462,7 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
       logger.error("Could not read Vertx version", e);;
     }
     logger.info("Vertx: " + version);
-    logger.info("Event Loop Size: " + ((MultithreadEventExecutorGroup)vertx.nettyEventLoopGroup()).executorCount());
+    logger.info("Event Loop Size: " + ((MultithreadEventExecutorGroup) (((VertxInternal) vertx).nettyEventLoopGroup())).executorCount());
     logger.info("Native transport : " + nativeTransport);
     logger.info("Transport : " + transport);
   }
