@@ -2,7 +2,12 @@ package vertx;
 
 import com.fizzed.rocker.ContentType;
 import com.fizzed.rocker.RockerOutputFactory;
+import io.micrometer.core.instrument.Meter;
+import io.micrometer.core.instrument.config.MeterFilter;
+import io.micrometer.core.instrument.distribution.DistributionStatisticConfig;
+import io.micrometer.prometheus.PrometheusMeterRegistry;
 import io.netty.util.concurrent.MultithreadEventExecutorGroup;
+import io.prometheus.client.exporter.common.TextFormat;
 import io.vertx.core.*;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.*;
@@ -12,6 +17,9 @@ import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import io.vertx.micrometer.MicrometerMetricsOptions;
+import io.vertx.micrometer.VertxPrometheusOptions;
+import io.vertx.micrometer.backends.BackendRegistries;
 import io.vertx.pgclient.PgConnectOptions;
 import io.vertx.pgclient.PgConnection;
 import io.vertx.sqlclient.*;
@@ -65,6 +73,7 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
   private static final String PATH_UPDATES = "/updates";
   private static final String PATH_FORTUNES = "/fortunes";
   private static final String PATH_CACHING = "/cached-queries";
+  private static final String PATH_METRICS = "/metrics";
 
   private static final CharSequence RESPONSE_TYPE_PLAIN = HttpHeaders.createOptimized("text/plain");
   private static final CharSequence RESPONSE_TYPE_HTML = HttpHeaders.createOptimized("text/html; charset=UTF-8");
@@ -180,6 +189,9 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
           break;
         case PATH_CACHING:
           handleCaching(request);
+          break;
+        case PATH_METRICS:
+          handleMetrics(request);
           break;
         default:
           request.response().setStatusCode(404);
@@ -412,6 +424,13 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
     response.end(json.toBuffer());
   }
 
+  private void handleMetrics(HttpServerRequest req) {
+    PrometheusMeterRegistry registry = (PrometheusMeterRegistry) BackendRegistries.getDefaultNow();
+    req.response()
+            .putHeader(HttpHeaders.CONTENT_TYPE, TextFormat.CONTENT_TYPE_004)
+            .end(registry.scrape());
+  }
+
   public static void main(String[] args) throws Exception {
 
     int eventLoopPoolSize = VertxOptions.DEFAULT_EVENT_LOOP_POOL_SIZE;
@@ -424,7 +443,23 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
       }
     }
     JsonObject config = new JsonObject(new String(Files.readAllBytes(new File(args[0]).toPath())));
-    Vertx vertx = Vertx.vertx(new VertxOptions().setEventLoopPoolSize(eventLoopPoolSize).setPreferNativeTransport(true));
+    VertxOptions vertxOptions = new VertxOptions().setEventLoopPoolSize(eventLoopPoolSize).setPreferNativeTransport(true);
+    MicrometerMetricsOptions metricsOptions = new MicrometerMetricsOptions()
+            .setEnabled(true)
+            .setPrometheusOptions(new VertxPrometheusOptions().setEnabled(true));
+    vertxOptions.setMetricsOptions(metricsOptions);
+    Vertx vertx = Vertx.vertx(vertxOptions);
+    PrometheusMeterRegistry registry = (PrometheusMeterRegistry) BackendRegistries.getDefaultNow();
+    registry.config().meterFilter(
+            new MeterFilter() {
+              @Override
+              public DistributionStatisticConfig configure(Meter.Id id, DistributionStatisticConfig config) {
+                return DistributionStatisticConfig.builder()
+                        .percentilesHistogram(true)
+                        .build()
+                        .merge(config);
+              }
+            });
     vertx.exceptionHandler(err -> {
       err.printStackTrace();
     });
