@@ -21,6 +21,17 @@
 				<enabled>true</enabled>
 			</snapshots>
 		</repository>
+		<repository>
+			<id>spring-milestone</id>
+			<name>Spring Milestone</name>
+			<url>https://repo.spring.io/milestone</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</repository>
 	</repositories>
 
 	<properties>
@@ -32,7 +43,7 @@
 		<jackson.version>2.16.1</jackson.version>
 		<netty.version>4.1.108.Final</netty.version>
 		<netty.io_uring.version>0.0.25.Final</netty.io_uring.version>
-		<micrometer.version>1.12.4</micrometer.version>
+		<micrometer.version>1.13.0-RC1</micrometer.version>
 	</properties>
 
 	<dependencies>
