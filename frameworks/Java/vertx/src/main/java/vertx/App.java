@@ -5,9 +5,8 @@ import com.fizzed.rocker.RockerOutputFactory;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.config.MeterFilter;
 import io.micrometer.core.instrument.distribution.DistributionStatisticConfig;
-import io.micrometer.prometheus.PrometheusMeterRegistry;
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import io.netty.util.concurrent.MultithreadEventExecutorGroup;
-import io.prometheus.client.exporter.common.TextFormat;
 import io.vertx.core.*;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.*;
@@ -427,7 +426,7 @@ public class App extends AbstractVerticle implements Handler<HttpServerRequest> 
   private void handleMetrics(HttpServerRequest req) {
     PrometheusMeterRegistry registry = (PrometheusMeterRegistry) BackendRegistries.getDefaultNow();
     req.response()
-            .putHeader(HttpHeaders.CONTENT_TYPE, TextFormat.CONTENT_TYPE_004)
+            .putHeader(HttpHeaders.CONTENT_TYPE, "text/plain; version=0.0.4; charset=utf-8")
             .end(registry.scrape());
   }
 
