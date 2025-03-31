@@ -124,7 +124,7 @@ public class PoolCreator implements PgPoolCreator {
 
         @Override
         public void handle(Long event) {
-            System.out.println("Ratio for event loop " + context.nettyEventLoop() + " is " + ((double) sameEventloop / total));
+            System.out.println("Ratio for event loop " + Thread.currentThread().getName() + " is " + ((double) sameEventloop / total));
         }
 
         void cancelTimer() {
