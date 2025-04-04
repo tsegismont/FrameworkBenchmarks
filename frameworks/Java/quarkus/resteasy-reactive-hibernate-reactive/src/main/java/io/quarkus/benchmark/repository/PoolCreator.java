@@ -3,6 +3,7 @@ package io.quarkus.benchmark.repository;
 import java.util.function.Function;
 
 import io.netty.util.concurrent.FastThreadLocal;
+import io.quarkus.logging.Log;
 import io.quarkus.reactive.pg.client.PgPoolCreator;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Context;
@@ -133,8 +134,7 @@ public class PoolCreator implements PgPoolCreator {
         public void handle(Long event) {
             if ( needsPrint ) {
                 needsPrint = false;
-                System.out.println( "Ratio for event loop " + Thread.currentThread()
-                        .getName() + " is " + ( (double) sameEventloop / total ) );
+                Log.info( "Ratio for this event loop is: " + ( (double) sameEventloop / total ) );
             }
         }
 
