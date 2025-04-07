@@ -1,7 +1,5 @@
 package io.quarkus.benchmark.repository;
 
-import java.util.function.Function;
-
 import io.netty.util.concurrent.FastThreadLocal;
 import io.quarkus.logging.Log;
 import io.quarkus.reactive.pg.client.PgPoolCreator;
@@ -11,16 +9,14 @@ import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.impl.ContextInternal;
 import io.vertx.pgclient.PgPool;
-import io.vertx.sqlclient.PrepareOptions;
-import io.vertx.sqlclient.PreparedQuery;
-import io.vertx.sqlclient.Query;
-import io.vertx.sqlclient.Row;
-import io.vertx.sqlclient.RowSet;
-import io.vertx.sqlclient.SqlConnection;
+import io.vertx.sqlclient.*;
 import io.vertx.sqlclient.impl.SocketConnectionBase;
 import io.vertx.sqlclient.impl.SqlConnectionInternal;
 import io.vertx.sqlclient.impl.pool.SqlConnectionPool.PooledConnection;
 import jakarta.inject.Singleton;
+
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 @Singleton
 public class PoolCreator implements PgPoolCreator {
@@ -40,7 +36,16 @@ public class PoolCreator implements PgPoolCreator {
     @Override
     public PgPool create(Input input) {
         PgPool delegate = PgPool.pool(input.vertx(), input.pgConnectOptionsList(), input.poolOptions());
-        return new MonitoredPool(delegate);
+        MonitoredPool monitoredPool = new MonitoredPool(delegate);
+        AtomicInteger poolSize = new AtomicInteger(monitoredPool.size());
+        input.vertx().setPeriodic(5000, l -> {
+            int size = monitoredPool.size();
+            if (size != poolSize.get()) {
+                poolSize.set(size);
+                Log.info("Monitored pool size is: " + size);
+            }
+        });
+        return monitoredPool;
     }
 
     private static class MonitoredPool implements PgPool {
@@ -132,9 +137,9 @@ public class PoolCreator implements PgPoolCreator {
 
         @Override
         public void handle(Long event) {
-            if ( needsPrint ) {
+            if (needsPrint) {
                 needsPrint = false;
-                Log.info( "Ratio for this event loop is: " + ( (double) sameEventloop / total ) );
+                Log.info("Ratio for this event loop is: " + ((double) sameEventloop / total));
             }
         }
 
