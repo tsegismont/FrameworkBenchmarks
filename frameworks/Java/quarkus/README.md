@@ -15,7 +15,7 @@ There are currently 2 implementations:
 
 ## Versions
 
-* [Java OpenJDK 17](http://openjdk.java.net/)
+* [Java OpenJDK 21](http://openjdk.java.net/)
 * [Quarkus 3.23.2](https://quarkus.io)
 
 ## Test URLs
