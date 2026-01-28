@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/openjdk-21:1.22 as maven
+FROM registry.access.redhat.com/ubi9/openjdk-21:1.23 as maven
 ENV LANGUAGE='en_US:en'
 
 WORKDIR /quarkus
@@ -29,7 +29,7 @@ WORKDIR /quarkus/$MODULE
 RUN mvn package -B -q
 WORKDIR /quarkus
 
-FROM registry.access.redhat.com/ubi9/openjdk-21-runtime:1.22
+FROM registry.access.redhat.com/ubi9/openjdk-21-runtime:1.23
 ENV LANGUAGE='en_US:en'
 WORKDIR /quarkus
 ENV MODULE=resteasy-reactive-hibernate-reactive
