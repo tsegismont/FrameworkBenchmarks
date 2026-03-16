@@ -56,20 +56,6 @@ public class WorldRepository extends BaseRepository {
         return loopRoot.replaceWith(worlds);
     }
 
-    public Uni<List<World>> findManaged(Mutiny.Session s, int count) {
-        final List<World> worlds = new ArrayList<>(count);
-        //The rules require individual load: we can't use the Hibernate feature which allows load by multiple IDs
-        // as one single operation as Hibernate is too smart and will switch to use batched loads.
-        // But also, we can't use "Uni#join" as we did in the above method as managed entities shouldn't use pipelining -
-        // so we also have to avoid Mutiny optimising things by establishing an explicit chain:
-        final LocalRandom localRandom = Randomizer.current();
-        Uni<Void> loopRoot = Uni.createFrom().voidItem();
-        for (int i = 0; i < count; i++) {
-            loopRoot = loopRoot.call(() -> s.find(World.class, localRandom.getNextRandom()).invoke(worlds::add));
-        }
-        return loopRoot.replaceWith(worlds);
-    }
-
     public Uni<World> findStateless() {
         return inStatelessSession(session -> session.get(World.class, Randomizer.current().getNextRandom()));
     }
