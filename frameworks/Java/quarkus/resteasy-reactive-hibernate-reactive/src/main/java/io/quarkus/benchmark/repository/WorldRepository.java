@@ -37,18 +37,15 @@ public class WorldRepository extends BaseRepository {
         });
     }
 
-    public Uni<List<World>> update(Mutiny.Session session, List<World> worlds) {
-        return session
-                .setBatchSize(worlds.size())
-                .flush()
-                .map(v -> worlds);
+    public Uni<List<World>> update(Mutiny.StatelessSession session, List<World> worlds) {
+        return session.updateMultiple(worlds).replaceWith(worlds);
     }
 
     public Uni<List<World>> findStateless(int count) {
         return inStatelessSession(session -> findStateless(session, count));
     }
 
-    private Uni<List<World>> findStateless(Mutiny.StatelessSession s, int count) {
+    public Uni<List<World>> findStateless(Mutiny.StatelessSession s, int count) {
         //The rules require individual load: we can't use the Hibernate feature which allows load by multiple IDs
         // as one single operation as Hibernate is too smart and will switch to use batched loads automatically.
         // Hence, use this awkward alternative:
