@@ -24,16 +24,14 @@ public class WorldRepository extends BaseRepository {
         return inSession(s -> {
             final LocalRandom random = Randomizer.current();
             int MAX = 10000;
-            Uni<Void>[] unis = new Uni[MAX];
+            Uni<Void> loop = Uni.createFrom().voidItem();
             for (int i = 0; i < MAX; i++) {
                 final World world = new World();
                 world.setId(i + 1);
                 world.setRandomNumber(random.getNextRandom());
-                unis[i] = s.persist(world).map(v -> null);
+                loop = loop.call(() -> s.persist(world));
             }
-            return Uni.combine().all().unis(unis).with(l -> null)
-                    .flatMap(v -> s.flush())
-                    .map(v -> null);
+            return loop.call(s::flush);
         });
     }
 
